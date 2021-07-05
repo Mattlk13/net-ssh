@@ -5,7 +5,6 @@ require 'net/ssh/transport/hmac/sha2_256'
 
 module Transport
   module HMAC
-
     class TestSHA2_256 < NetSSHTest
       def test_expected_digest_class
         assert_equal OpenSSL::Digest::SHA256, subject.digest_class
@@ -20,6 +19,11 @@ module Transport
       def test_expected_mac_length
         assert_equal 32, subject.mac_length
         assert_equal 32, subject.new.mac_length
+      end
+
+      def test_expected_etm
+        assert_equal false, subject.etm
+        assert_equal false, subject.new.etm
       end
 
       def test_expected_digest

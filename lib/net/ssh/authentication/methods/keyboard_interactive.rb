@@ -5,7 +5,6 @@ module Net
   module SSH
     module Authentication
       module Methods
-
         # Implements the "keyboard-interactive" SSH authentication method.
         class KeyboardInteractive < Abstract
           USERAUTH_INFO_REQUEST  = 60
@@ -32,6 +31,7 @@ module Net
                   message[:authentications].split(/,/).include? 'keyboard-interactive'
 
                 return false unless interactive?
+
                 password = nil
                 debug { "retrying keyboard-interactive" }
                 send_message(userauth_request(username, next_service, "keyboard-interactive", "", ""))
@@ -40,7 +40,9 @@ module Net
                 instruction = message.read_string
                 debug { "keyboard-interactive info request" }
 
-                prompter = prompt.start(type: 'keyboard-interactive', name: name, instruction: instruction) if password.nil? && interactive? && prompter.nil?
+                if password.nil? && interactive? && prompter.nil?
+                  prompter = prompt.start(type: 'keyboard-interactive', name: name, instruction: instruction)
+                end
 
                 _ = message.read_string # lang_tag
                 responses = []

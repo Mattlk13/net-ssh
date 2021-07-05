@@ -11,7 +11,6 @@ require 'net/ssh/authentication/methods/keyboard_interactive'
 module Net
   module SSH
     module Authentication
-
       # Raised if the current authentication method is not allowed
       class DisallowedMethod < Net::SSH::Exception
       end
@@ -63,28 +62,28 @@ module Net
 
           key_manager = KeyManager.new(logger, options)
           keys.each { |key| key_manager.add(key) } unless keys.empty?
+          keycerts.each { |keycert| key_manager.add_keycert(keycert) } unless keycerts.empty?
           key_data.each { |key2| key_manager.add_key_data(key2) } unless key_data.empty?
           default_keys.each { |key| key_manager.add(key) } unless options.key?(:keys) || options.key?(:key_data)
 
           attempted = []
 
           @auth_methods.each do |name|
+            next unless @allowed_auth_methods.include?(name)
+
+            attempted << name
+
+            debug { "trying #{name}" }
             begin
-              next unless @allowed_auth_methods.include?(name)
-              attempted << name
-
-              debug { "trying #{name}" }
-              begin
-                auth_class = Methods.const_get(name.split(/\W+/).map { |p| p.capitalize }.join)
-                method = auth_class.new(self, key_manager: key_manager, password_prompt: options[:password_prompt])
-              rescue NameError
-                debug {"Mechanism #{name} was requested, but isn't a known type.  Ignoring it."}
-                next
-              end
-
-              return true if method.authenticate(next_service, username, password)
-            rescue Net::SSH::Authentication::DisallowedMethod
+              auth_class = Methods.const_get(name.split(/\W+/).map { |p| p.capitalize }.join)
+              method = auth_class.new(self, key_manager: key_manager, password_prompt: options[:password_prompt])
+            rescue NameError
+              debug {"Mechanism #{name} was requested, but isn't a known type.  Ignoring it."}
+              next
             end
+
+            return true if method.authenticate(next_service, username, password)
+          rescue Net::SSH::Authentication::DisallowedMethod
           end
 
           error { "all authorization methods failed (tried #{attempted.join(', ')})" }
@@ -128,6 +127,7 @@ module Net
         def expect_message(type)
           message = next_message
           raise Net::SSH::Exception, "expected #{type}, got #{message.type} (#{message})" unless message.type == type
+
           message
         end
 
@@ -136,18 +136,20 @@ module Net
         # Returns an array of paths to the key files usually defined
         # by system default.
         def default_keys
-          if defined?(OpenSSL::PKey::EC)
-            %w[~/.ssh/id_ed25519 ~/.ssh/id_rsa ~/.ssh/id_dsa ~/.ssh/id_ecdsa
-               ~/.ssh2/id_ed25519 ~/.ssh2/id_rsa ~/.ssh2/id_dsa ~/.ssh2/id_ecdsa]
-          else
-            %w[~/.ssh/id_dsa ~/.ssh/id_rsa ~/.ssh2/id_dsa ~/.ssh2/id_rsa]
-          end
+          %w[~/.ssh/id_ed25519 ~/.ssh/id_rsa ~/.ssh/id_dsa ~/.ssh/id_ecdsa
+             ~/.ssh2/id_ed25519 ~/.ssh2/id_rsa ~/.ssh2/id_dsa ~/.ssh2/id_ecdsa]
         end
 
         # Returns an array of paths to the key files that should be used when
         # attempting any key-based authentication mechanism.
         def keys
           Array(options[:keys])
+        end
+
+        # Returns an array of paths to the keycert files that should be used when
+        # attempting any key-based authentication mechanism.
+        def keycerts
+          Array(options[:keycerts])
         end
 
         # Returns an array of the key data that should be used when

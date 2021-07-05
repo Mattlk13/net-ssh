@@ -2,7 +2,6 @@ require_relative '../common'
 require 'net/ssh/connection/session'
 
 module Connection
-
   class TestSession < NetSSHTest
     include Net::SSH::Connection::Constants
 
@@ -119,7 +118,7 @@ module Connection
     def test_can_open_channels_in_process # see #110
       chid = session.send(:get_next_channel_id)
       session.channels[chid] = stub("channel", local_closed?: false)
-      session.channels[chid].expects(:process).with() do
+      session.channels[chid].expects(:process).with do
         session.open_channel
         true
       end
@@ -225,7 +224,7 @@ module Connection
 
     def test_channel_open_packet_with_corresponding_handler_should_result_in_channel_open_failure_when_handler_returns_an_error
       transport.return(CHANNEL_OPEN, :string, "auth-agent", :long, 14, :long, 0x20000, :long, 0x10000)
-      session.on_open_channel "auth-agent" do |s, ch, p|
+      session.on_open_channel "auth-agent" do |_s, _ch, _p|
         raise Net::SSH::ChannelOpenFailed.new(1234, "we iz in ur channelz!")
       end
       process_times(2)
@@ -293,33 +292,33 @@ module Connection
     end
 
     def test_channel_eof_packet_should_be_routed_to_corresponding_channel
-      channel_at(14).expects(:do_eof).with()
+      channel_at(14).expects(:do_eof).with
       transport.return(CHANNEL_EOF, :long, 14)
       process_times(2)
     end
 
     def test_channel_success_packet_should_be_routed_to_corresponding_channel
-      channel_at(14).expects(:do_success).with()
+      channel_at(14).expects(:do_success).with
       transport.return(CHANNEL_SUCCESS, :long, 14)
       process_times(2)
     end
 
     def test_channel_failure_packet_should_be_routed_to_corresponding_channel
-      channel_at(14).expects(:do_failure).with()
+      channel_at(14).expects(:do_failure).with
       transport.return(CHANNEL_FAILURE, :long, 14)
       process_times(2)
     end
 
     def test_channel_close_packet_should_be_routed_to_corresponding_channel_and_channel_should_be_closed_and_removed
-      session.channels[14] = stub("channel") do
+      session.channels[14] = stub("channel").tap do |channel|
         # this simulates the case where we closed the channel first, sent
         # CHANNEL_CLOSE to server and are waiting for server's response.
-        expects(:local_closed?).returns(true)
-        expects(:do_close)
-        expects(:close).with()
-        expects(:remote_closed!).with()
-        expects(:remote_closed?).with().returns(true)
-        expects(:local_id).returns(14)
+        channel.expects(:local_closed?).returns(true)
+        channel.expects(:do_close)
+        channel.expects(:close).with
+        channel.expects(:remote_closed!).with.at_least_once
+        channel.expects(:remote_closed?).with.returns(true)
+        channel.expects(:local_id).returns(14)
       end
 
       transport.return(CHANNEL_CLOSE, :long, 14)
@@ -328,8 +327,8 @@ module Connection
     end
 
     def test_multiple_pending_dispatches_should_be_dispatched_together
-      channel_at(14).expects(:do_eof).with()
-      session.channels[14].expects(:do_success).with()
+      channel_at(14).expects(:do_eof).with
+      session.channels[14].expects(:do_success).with
       transport.return(CHANNEL_SUCCESS, :long, 14)
       transport.return(CHANNEL_EOF, :long, 14)
       process_times(2)
@@ -460,7 +459,7 @@ module Connection
       prep_exec("ls", :stdout, "data packet", :stderr, "extended data packet")
 
       call = :first
-      session.exec "ls" do |channel, type, data|
+      session.exec "ls" do |_channel, type, data|
         if call == :first
           assert_equal :stdout, type
           assert_equal "data packet", data
@@ -490,7 +489,7 @@ module Connection
     def test_exec_bang_should_block_until_command_finishes
       prep_exec("ls", :stdout, "some data")
       called = false
-      session.exec! "ls" do |channel, type, data|
+      session.exec! "ls" do |_channel, type, data|
         called = true
         assert_equal :stdout, type
         assert_equal "some data", data
@@ -536,6 +535,7 @@ module Connection
 
           data.each_slice(2) do |type, datum|
             next if datum.empty?
+
             if type == :stdout
               t2.return(CHANNEL_DATA, :long, p[:remote_id], :string, datum)
             else
@@ -544,7 +544,7 @@ module Connection
           end
 
           t2.return(CHANNEL_CLOSE, :long, p[:remote_id])
-          t2.expect { |t3,p3| assert_equal CHANNEL_CLOSE, p3.type }
+          t2.expect { |_t3,p3| assert_equal CHANNEL_CLOSE, p3.type }
         end
       end
     end
@@ -583,5 +583,4 @@ module Connection
       session.process { (i += 1) < n }
     end
   end
-
 end

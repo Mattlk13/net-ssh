@@ -8,8 +8,11 @@
     homedir: /home/vagrant
     ruby_version: '2.0.0-p598'
     ruby_versions:
-      - '2.0.0-p598'
-      - '2.3.0'
+      - '2.5.8'
+      - '2.6.6'
+      - '2.7.1'
+      - '3.0.1'
+#      - 'ruby-head'
 #      - 'rbx-3.19'
 #      - 'jruby-9.0.5.0'
     rvm_install_path: '/usr/local/rvm'
@@ -41,13 +44,14 @@
     - lineinfile: dest=/etc/sudoers.d/net_ssh_1 mode=0440 state=present create=yes
         line='net_ssh_2 ALL=(ALL) NOPASSWD:ALL' regexp=net_ssh_2
     - unarchive:
-        src: https://ftp.spline.de/pub/OpenBSD/OpenSSH/portable/openssh-7.4p1.tar.gz
+        src: https://cdn.openbsd.org/pub/OpenBSD/OpenSSH/portable/openssh-7.9p1.tar.gz
         dest: /tmp
         remote_src: True
-    - name: building and installing openssh 7.4 (used in forward test)
+        validate_certs: False
+    - name: building and installing openssh 7.9 (used in forward test)
       command: sh -c "./configure --prefix=/opt/net-ssh-openssh && make && sudo make install"
       args:
-        chdir: /tmp/openssh-7.4p1/
+        chdir: /tmp/openssh-7.9p1/
     - name: drop installed openssh etc/ in favor of symlink
       file:
         state: absent
@@ -80,6 +84,9 @@
     - name: sshd allow forward
       lineinfile: dest='/etc/ssh/sshd_config' line='GatewayPorts yes' regexp=LogLevel
       notify: restart sshd
+    - name: sshd allow forward
+      lineinfile: dest='/etc/ssh/sshd_config' line='PasswordAuthentication=yes' regexp=PasswordAuthentication
+      notify: restart sshd
     - name: put NET_SSH_RUN_INTEGRATION_TESTS=YES environment
       lineinfile: dest='/etc/environment' line='NET_SSH_RUN_INTEGRATION_TESTS=YES'
     - name: change dir in bashrc
@@ -88,13 +95,20 @@
     - name: add host aliases
       lineinfile: dest='/etc/hosts' owner='root' group='root' mode=0644
         regexp='^127\.0\.0\.1\s+gateway.netssh' line='127.0.0.1  gateway.netssh'
-    - apt:
+    - name: Update APT Cache
+      apt:
+        update_cache: yes
+        force_apt_get: yes
+    - name: Wait for locfile removal
+      become: yes
+      shell:  while sudo fuser /var/lib/dpkg/lock >/dev/null 2>&1; do sleep 5; done;
+    - name: Install packages
+      apt:
         pkg:
           - pv
           - libgmp3-dev
           - git
         state: present
-        update_cache: yes
     - copy: content='echo "cd /net-ssh ; rake integration-test"' dest=/etc/update-motd.d/99-net-ssh-tests mode=0755
     - name: add user to rvm group so they can change gem wrappers
       user:

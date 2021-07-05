@@ -1,7 +1,49 @@
+=== 6.2.0 rc1
+
+=== 6.2.0 beta1
+
+  * rsa-sha2-512, rsa-sha2-256 host_key algs [#771]
+  * JRuby aes*-ctr suppport [#767]
+
+=== 6.1.0
+
+  * Adapt to ssh's default behaviors when no username is provided.
+    When Net::SSH.start user is nil and config has no entry
+    we default to Etc.getpwuid.name() instead of Etc.getlogin(). [#749]
+
+=== 6.1.0.rc1
+
+  * Make sha2-{256,512}-etm@openssh.com MAC default again [#761]
+  * Support algorithm subtraction syntax from ssh_config [#751]
+
+=== 6.0.2
+
+  * Fix corrupted hmac issue in etm hmac [#759]
+
+=== 6.0.1
+
+  * Make sha2-{256,512}-etm@openssh.com MAC opt-in as they seems to have issues [#757]
+
+=== 6.0.0
+
+  * Support empty lines and comments in known_hosts [donoghuc, #742]
+  * Add sha2-{256,512}-etm@openssh.com MAC algorithms [graaff, #714]
+
+=== 6.0.0 beta2
+  
+  * Support :certkeys and CertificateFile configuration option  [Anders Carling, #722]
+
+=== 6.0.0 beta1
+
+  * curve25519sha256 support [Florian Wininger ,#690]
+  * disabled insecure algs [Florian Wininger , #709]
+
+=== 5.2.0
+
 === 5.2.0.rc3
 
   * Fix check_host_ip read from config
-  * Support ssh-ed25519 in kown hosts
+  * Support ssh-ed25519 in known hosts
 
 === 5.2.0.rc2
 
@@ -24,7 +66,7 @@
 
 === 5.0.2
 
-  * fix ctr for jruby [#612]
+  * Fix ctr for jruby [#612]
 
 === 5.0.1
 

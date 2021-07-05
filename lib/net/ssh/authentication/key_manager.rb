@@ -6,7 +6,6 @@ require 'net/ssh/authentication/agent'
 module Net
   module SSH
     module Authentication
-
       # A trivial exception class used to report errors in the key manager.
       class KeyManagerError < Net::SSH::Exception; end
 
@@ -30,6 +29,9 @@ module Net
         # The list of user key data that will be examined
         attr_reader :key_data
 
+        # The list of user key certificate files that will be examined
+        attr_reader :keycert_files
+
         # The map of loaded identities
         attr_reader :known_identities
 
@@ -43,6 +45,7 @@ module Net
           self.logger = logger
           @key_files = []
           @key_data = []
+          @keycert_files = []
           @use_agent = options[:use_agent] != false
           @known_identities = {}
           @agent = nil
@@ -63,6 +66,12 @@ module Net
         # Add the given key_file to the list of key files that will be used.
         def add(key_file)
           key_files.push(File.expand_path(key_file)).uniq!
+          self
+        end
+
+        # Add the given keycert_file to the list of keycert files that will be used.
+        def add_keycert(keycert_file)
+          keycert_files.push(File.expand_path(keycert_file)).uniq!
           self
         end
 
@@ -108,7 +117,7 @@ module Net
               user_identities.delete(corresponding_user_identity) if corresponding_user_identity
 
               if !options[:keys_only] || corresponding_user_identity
-                known_identities[key] = { from: :agent }
+                known_identities[key] = { from: :agent, identity: key }
                 yield key
               end
             end
@@ -120,6 +129,21 @@ module Net
             key = identity.delete(:public_key)
             known_identities[key] = identity
             yield key
+          end
+
+          known_identity_blobs = known_identities.keys.map(&:to_blob)
+          keycert_files.each do |keycert_file|
+            keycert = KeyFactory.load_public_key(keycert_file)
+            next if known_identity_blobs.include?(keycert.to_blob)
+
+            (_, corresponding_identity) = known_identities.detect { |public_key, _|
+              public_key.to_pem == keycert.to_pem
+            }
+
+            if corresponding_identity
+              known_identities[keycert] = corresponding_identity
+              yield keycert
+            end
           end
 
           self
@@ -152,7 +176,8 @@ module Net
 
           if info[:from] == :agent
             raise KeyManagerError, "the agent is no longer available" unless agent
-            return agent.sign(identity, data.to_s)
+
+            return agent.sign(info[:identity], data.to_s)
           end
 
           raise KeyManagerError, "[BUG] can't determine identity origin (#{info.inspect})"
@@ -176,6 +201,7 @@ module Net
         # or if the agent is otherwise not available.
         def agent
           return unless use_agent?
+
           @agent ||= Agent.connect(logger, options[:agent_socket_factory], options[:identity_agent])
         rescue AgentNotAvailable
           @use_agent = false
@@ -223,33 +249,35 @@ module Net
         # Load prepared identities. Private key decryption errors ignored if ignore_decryption_errors
         def load_identities(identities, ask_passphrase, ignore_decryption_errors)
           identities.map do |identity|
-            begin
-              case identity[:load_from]
-              when :pubkey_file
-                key = KeyFactory.load_public_key(identity[:pubkey_file])
-                { public_key: key, from: :file, file: identity[:privkey_file] }
-              when :privkey_file
-                private_key = KeyFactory.load_private_key(identity[:privkey_file], options[:passphrase], ask_passphrase, options[:password_prompt])
-                key = private_key.send(:public_key)
-                { public_key: key, from: :file, file: identity[:privkey_file], key: private_key }
-              when :data
-                private_key = KeyFactory.load_data_private_key(identity[:data], options[:passphrase], ask_passphrase, "<key in memory>", options[:password_prompt])
-                key = private_key.send(:public_key)
-                { public_key: key, from: :key_data, data: identity[:data], key: private_key }
-              else
-                identity
-              end
-            rescue OpenSSL::PKey::RSAError, OpenSSL::PKey::DSAError, OpenSSL::PKey::ECError, OpenSSL::PKey::PKeyError, ArgumentError => e
-              if ignore_decryption_errors
-                identity
-              else
-                process_identity_loading_error(identity, e)
-                nil
-              end
-            rescue Exception => e
+            case identity[:load_from]
+            when :pubkey_file
+              key = KeyFactory.load_public_key(identity[:pubkey_file])
+              { public_key: key, from: :file, file: identity[:privkey_file] }
+            when :privkey_file
+              private_key = KeyFactory.load_private_key(
+                identity[:privkey_file], options[:passphrase], ask_passphrase, options[:password_prompt]
+              )
+              key = private_key.send(:public_key)
+              { public_key: key, from: :file, file: identity[:privkey_file], key: private_key }
+            when :data
+              private_key = KeyFactory.load_data_private_key(
+                identity[:data], options[:passphrase], ask_passphrase, "<key in memory>", options[:password_prompt]
+              )
+              key = private_key.send(:public_key)
+              { public_key: key, from: :key_data, data: identity[:data], key: private_key }
+            else
+              identity
+            end
+          rescue OpenSSL::PKey::RSAError, OpenSSL::PKey::DSAError, OpenSSL::PKey::ECError, OpenSSL::PKey::PKeyError, ArgumentError => e
+            if ignore_decryption_errors
+              identity
+            else
               process_identity_loading_error(identity, e)
               nil
             end
+          rescue Exception => e
+            process_identity_loading_error(identity, e)
+            nil
           end.compact
         end
 

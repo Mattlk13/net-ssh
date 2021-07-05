@@ -4,6 +4,7 @@ ENV['HOME'] ||= ENV['HOMEPATH'] ? "#{ENV['HOMEDRIVE']}#{ENV['HOMEPATH']}" : Dir.
 
 require 'logger'
 require 'etc'
+require 'shellwords'
 
 require 'net/ssh/config'
 require 'net/ssh/errors'
@@ -14,7 +15,6 @@ require 'net/ssh/connection/session'
 require 'net/ssh/prompt'
 
 module Net
-
   # Net::SSH is a library for interacting, programmatically, with remote
   # processes via the SSH2 protocol. Sessions are always initiated via
   # Net::SSH.start. From there, a program interacts with the new SSH session
@@ -66,11 +66,11 @@ module Net
       auth_methods bind_address compression compression_level config
       encryption forward_agent hmac host_key remote_user
       keepalive keepalive_interval keepalive_maxcount kex keys key_data
-      languages logger paranoid password port proxy
+      keycerts languages logger paranoid password port proxy
       rekey_blocks_limit rekey_limit rekey_packet_limit timeout verbose
       known_hosts global_known_hosts_file user_known_hosts_file host_key_alias
       host_name user properties passphrase keys_only max_pkt_size
-      max_win_size send_env use_agent number_of_password_prompts
+      max_win_size send_env set_env use_agent number_of_password_prompts
       append_all_supported_algorithms non_interactive password_prompt
       agent_socket_factory minimum_dh_bits verify_host_key
       fingerprint_hash check_host_ip
@@ -144,6 +144,8 @@ module Net
     # * :kex => the key exchange algorithm (or algorithms) to use
     # * :keys => an array of file names of private keys to use for publickey
     #   and hostbased authentication
+    # * :keycerts => an array of file names of key certificates to use
+    #    with publickey authentication
     # * :key_data => an array of strings, with each element of the array being
     #   a raw private key in PEM format.
     # * :keys_only => set to +true+ to use only private keys from +keys+ and
@@ -173,6 +175,8 @@ module Net
     # * :rekey_packet_limit => the max number of packets to process before rekeying
     # * :send_env => an array of local environment variable names to export to the
     #   remote environment. Names may be given as String or Regexp.
+    # * :set_env => a hash of environment variable names and values to set to the
+    #   remote environment. Override the ones if specified in +send_env+.
     # * :timeout => how long to wait for the initial connection to be made
     # * :user => the user name to log in as; this overrides the +user+
     #   parameter, and is primarily only useful when provided via an SSH
@@ -246,7 +250,7 @@ module Net
       transport = Transport::Session.new(host, options)
       auth = Authentication::Session.new(transport, options)
 
-      user = options.fetch(:user, user) || Etc.getlogin
+      user = options.fetch(:user, user) || Etc.getpwuid.name
       if auth.authenticate("ssh-connection", user, options[:password])
         connection = Connection::Session.new(transport, options)
         if block_given?

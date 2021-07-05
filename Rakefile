@@ -1,4 +1,3 @@
-
 #
 # Also in your terminal environment run:
 #   $ export LANG=en_US.UTF-8
@@ -32,7 +31,7 @@ RDoc::Task.new do |rdoc|
   rdoc.rdoc_dir = "rdoc"
   rdoc.title = "#{name} #{version}"
   rdoc.generator = 'hanna' # gem install hanna-nouveau
-  rdoc.main = 'README.rdoc'
+  rdoc.main = 'README.md'
   rdoc.rdoc_files.include("README*")
   rdoc.rdoc_files.include("bin/*.rb")
   rdoc.rdoc_files.include("lib/**/*.rb")
@@ -49,6 +48,7 @@ namespace :cert do
     raw = File.read "net-ssh-public_cert.pem"
     certificate = OpenSSL::X509::Certificate.new raw
     raise Exception, "Not yet expired: #{certificate.not_after}" unless certificate.not_after < Time.now
+
     sh "gem cert --build netssh@solutious.com --days 365*5 --private-key /mnt/gem/net-ssh-private_key.pem"
     sh "mv gem-public_cert.pem net-ssh-public_cert.pem"
     sh "gem cert --add net-ssh-public_cert.pem"

@@ -2,7 +2,6 @@ require_relative '../common'
 require 'net/ssh/authentication/agent'
 
 module Authentication
-
   class TestAgent < NetSSHTest
     SSH2_AGENT_REQUEST_VERSION       = 1
     SSH2_AGENT_REQUEST_IDENTITIES    = 11
@@ -12,6 +11,8 @@ module Authentication
     SSH2_AGENT_ADD_IDENTITY          = 17
     SSH2_AGENT_REMOVE_IDENTITY       = 18
     SSH2_AGENT_REMOVE_ALL_IDENTITIES = 19
+    SSH2_AGENT_LOCK                  = 22
+    SSH2_AGENT_UNLOCK                = 23
     SSH2_AGENT_ADD_ID_CONSTRAINED    = 25
     SSH2_AGENT_FAILURE               = 30
     SSH2_AGENT_VERSION_RESPONSE      = 103
@@ -26,17 +27,15 @@ module Authentication
     SSH_AGENT_CONSTRAIN_LIFETIME = 1
     SSH_AGENT_CONSTRAIN_CONFIRM  = 2
 
-    ED25519 = <<-EOF
------BEGIN OPENSSH PRIVATE KEY-----
-b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
-QyNTUxOQAAACDuVIPDUXcVkXOyNAaFsotbySHLNG/Gw6gc3j2k2zcRVAAAAKD6bG5++mxu
-fgAAAAtzc2gtZWQyNTUxOQAAACDuVIPDUXcVkXOyNAaFsotbySHLNG/Gw6gc3j2k2zcRVA
-AAAEAydU4FtZ9+5o5Y/m1aPNHFda37Fm0Us5FlUKx50tWw+e5Ug8NRdxWRc7I0BoWyi1vJ
-Ics0b8bDqBzePaTbNxFUAAAAGmJhcnRsZUBCYXJ0bGVzLU1hY0Jvb2stUHJvAQID
------END OPENSSH PRIVATE KEY-----
-EOF
-
-    # rubocop:disable LineLength
+    ED25519 = <<~EOF
+      -----BEGIN OPENSSH PRIVATE KEY-----
+      b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
+      QyNTUxOQAAACDuVIPDUXcVkXOyNAaFsotbySHLNG/Gw6gc3j2k2zcRVAAAAKD6bG5++mxu
+      fgAAAAtzc2gtZWQyNTUxOQAAACDuVIPDUXcVkXOyNAaFsotbySHLNG/Gw6gc3j2k2zcRVA
+      AAAEAydU4FtZ9+5o5Y/m1aPNHFda37Fm0Us5FlUKx50tWw+e5Ug8NRdxWRc7I0BoWyi1vJ
+      Ics0b8bDqBzePaTbNxFUAAAAGmJhcnRsZUBCYXJ0bGVzLU1hY0Jvb2stUHJvAQID
+      -----END OPENSSH PRIVATE KEY-----
+    EOF
     CERT = "\x00\x00\x00\x1Cssh-rsa-cert-v01@openssh.com\x00\x00\x00 Ir\xB9\xC9\x94l\x0ER\xA1h\xF5\xFDx\xB2J\xC6g\eHS\xDD\x162\x86\xF1\x90%\\$rf\xAF\x00\x00\x00\x03\x01\x00\x01\x00\x00\x01\x01\x00\xB3R\xBC\xF8\xEA\xA30\x90\x87\x85\xF6m\x80\xFB\x7F\x96%\xC0h\x85$\x05\x05J\x9BE\xD9\xDE\x81\xC0\xC9\xC2\xC0\x0F'\xD1TR\xCBb\xCD\xD0o\xA0\x15Q\x8B\xF26t\xC9!8\x85\xD2\f'\xC6\x14u\x1De\x90qyXl\a\x06\xA7\xD0\xB8 \xE1\xB3IP\xDE\xB5\xBE\x19\x0E\x97-M\xFDJT\x81\xE2\x8E>\xCD\x18\x9CJz\x1C\xB5}LsO\xF3\xAC\xAA\r\xAB\xF9\xD4\x83\x8DQ\x82\xE7F\xA4\x9F\x1C\x9A\xC5\xC3Y\x84k\x86\ef\xD7\x84\xE3\v\rlG\x15ya\xB0=\xDF\x11\x8D\x0FtZ/p\xBB\xB7g\xF5\xEBF8\xF5\x05}}\xDB\xFA\xA34dw\xE5\x80\xBC!=\x0E\x96\x18\bF\x10\a{\xFF\x9D2\xCA\xAAnu\x82\x82\xBA-F\x8C\x12\xBB\x04+nh\xE9N\xAF\fe\x16\x00Q\x9C\x1C\xCB\x94\x02\x8CQ\xFB,H[\x96\xF1Z4\nY]@\xE0\bs\x9Bh\x0E\xAA~\x105\x99\\\x8C\xA7q\x1A=\xA9\x9D\xBAbx\xF5`[\x8Aw\x80\b\xE0vy\x00\x00\x00\x00\x00\x00\x00c\x00\x00\x00\x01\x00\x00\x00\x06foobar\x00\x00\x00\b\x00\x00\x00\x04root\x00\x00\x00\x00Xk\\\x1C\x00\x00\x00\x00ZK>g\x00\x00\x00#\x00\x00\x00\rforce-command\x00\x00\x00\x0E\x00\x00\x00\n/bin/false\x00\x00\x00c\x00\x00\x00\x15permit-X11-forwarding\x00\x00\x00\x00\x00\x00\x00\x16permit-port-forwarding\x00\x00\x00\x00\x00\x00\x00\npermit-pty\x00\x00\x00\x00\x00\x00\x00\x0Epermit-user-rc\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01\x17\x00\x00\x00\assh-rsa\x00\x00\x00\x03\x01\x00\x01\x00\x00\x01\x01\x00\x9DRU\x0E\x83\x8Eb}\x81vOn\xCA\xBA\x01%\xFE\x87\x80b\xB5\x98R%\xA9(\xC1\xAE\xEFq|\x82L\xADQ?\x1D\xC6o\xB8\xD8pI\e\xFC\xF8\xFE^\xAD*\xA4u;\x99S\fc\x11\xBE\xFD\x047B\x1C\xF2h\xBA\xB1\xB0\n\x12F\e\x16\xF7Z\x8D\xD3\xF2f\xC0\x1C\xD8\xBE\xCC\x82\x85Qka$\xB6\xBD\x1C)\x85B\xAAf\xC8\xF3V*\xC3\x1C\xAA\xDC\xC3I\xDDe\xEFu\x02M\x12\x1A\xE2};he\x9D\xB5\xA47\xE4\x12\x8F\xE0\xF1\xA5\x91/\xFB\xEA\t\x0F \x1E\xB4B@+6\x1F\xBD\xA7\xA9u\x80\x19\xAA\xAC\xFFK\\F\x8C\xD9u\f?\xB9#[M\xDF\xB0\xFC\xE8\xF6J\x98\xA4\x99\x8F\xF9]\x88\x1D|A%\xAB\e\x0EN\xAA\xD3 \xCF\xA7}c\xDE\xF5\xBA4\xC8\xD2\x81(\x13\xB3\x94@fC\xDC\xDF\xFD\xA1\e$?\x13\xA9m\xEB*\xCA'\xB3\x19\x19\xF0\xD2\xB3P\x00\x96ou\xE90\xC4-\x1F\xCF\x1Aw\x034\xC6\xDF\xA7\x8C\xCA^Ix\x15\xFA\x9A+\x00\x00\x01\x0F\x00\x00\x00\assh-rsa\x00\x00\x01\x00I\b%\x01\xB2\xCC\x87\xD7\e\xC5\x88\x93|\x9D\xEC}\xA4\x86\xD7\xBB\xB6\xD3\x93\xFD\\\xC73\xC2*\aV\xA2\x81\x05J\x91\x9AEKV\n\xB4\xEB\xF3\xBC\xBAr\x16\xE5\x9A\xB9\xDC(0\xB4\x1C\x9F\"\x9E\xF9\x91\xD0\x1F\x9Cp\r*\xE3\x8A\xD3\xB9W$[OI\xD2\x8F8\x9B\xA4\x9E\xFFuGg\x00\xA5\xCD\r\xDB\x95\xEE)_\xC3\xBCi\xA2\xCC\r\x86\xFD\xE9\xE6\x188\x92\xFD\xCC\n\x98t\x8C\x16\xF4O\xF6\xD5\xD4\xB7\\\xB95\x19\xA3\xBBW\xF3\xF7r<\xE6\x8C\xFC\xE5\x9F\xBF\xE0\xBF\x06\xE7v\xF2\x8Ek\xA4\x02\xB6fMd\xA5e\x87\xE1\x93\xF5\x81\xCF\xDF\x88\xDC\a\xA2\e\xD5\xCA\x14\xB2>\xF4\x8F|\xE5-w\xF5\x85\xD0\xF1F((\xD1\xEEE&\x1D\xA2+\xEC\x93\xE7\xC7\xAE\xE38\xE4\xAE\xF7 \xED\xC6\r\xD6\x1A\xE1#<\xA2)j\xB3TA\\\xFF;\xC5\xA6Tu\xAAap\xDE\xF4\xF7 p\xCA\xD2\xBA\xDC\xCDv\x17\xC2\xBCQ\xDF\xAB7^\xA1G\x18\xB9\xB2F\x81\x9Fq\x92\xD3".force_encoding('BINARY')
 
     def setup
@@ -72,7 +71,7 @@ EOF
     end
 
     def test_negotiate_should_raise_error_if_response_was_unexpected
-      socket.expect do |s, type, buffer|
+      socket.expect do |s, type, _buffer|
         assert_equal SSH2_AGENT_REQUEST_VERSION, type
         s.return(255)
       end
@@ -80,7 +79,7 @@ EOF
     end
 
     def test_negotiate_should_be_successful_with_expected_response
-      socket.expect do |s, type, buffer|
+      socket.expect do |s, type, _buffer|
         assert_equal SSH2_AGENT_REQUEST_VERSION, type
         s.return(SSH_AGENT_RSA_IDENTITIES_ANSWER)
       end
@@ -88,7 +87,7 @@ EOF
     end
 
     def test_identities_should_fail_if_SSH_AGENT_FAILURE_received
-      socket.expect do |s, type, buffer|
+      socket.expect do |s, type, _buffer|
         assert_equal SSH2_AGENT_REQUEST_IDENTITIES, type
         s.return(SSH_AGENT_FAILURE)
       end
@@ -96,7 +95,7 @@ EOF
     end
 
     def test_identities_should_fail_if_SSH2_AGENT_FAILURE_received
-      socket.expect do |s, type, buffer|
+      socket.expect do |s, type, _buffer|
         assert_equal SSH2_AGENT_REQUEST_IDENTITIES, type
         s.return(SSH2_AGENT_FAILURE)
       end
@@ -104,7 +103,7 @@ EOF
     end
 
     def test_identities_should_fail_if_SSH_COM_AGENT2_FAILURE_received
-      socket.expect do |s, type, buffer|
+      socket.expect do |s, type, _buffer|
         assert_equal SSH2_AGENT_REQUEST_IDENTITIES, type
         s.return(SSH_COM_AGENT2_FAILURE)
       end
@@ -112,7 +111,7 @@ EOF
     end
 
     def test_identities_should_fail_if_response_is_not_SSH2_AGENT_IDENTITIES_ANSWER
-      socket.expect do |s, type, buffer|
+      socket.expect do |s, type, _buffer|
         assert_equal SSH2_AGENT_REQUEST_IDENTITIES, type
         s.return(255)
       end
@@ -123,7 +122,7 @@ EOF
       key1 = key
       key2 = OpenSSL::PKey::DSA.new(512)
 
-      socket.expect do |s, type, buffer|
+      socket.expect do |s, type, _buffer|
         assert_equal SSH2_AGENT_REQUEST_IDENTITIES, type
         s.return(SSH2_AGENT_IDENTITIES_ANSWER, :long, 2, :string, Net::SSH::Buffer.from(:key, key1), :string, "My favorite key", :string, Net::SSH::Buffer.from(:key, key2), :string, "Okay, but not the best")
       end
@@ -141,7 +140,7 @@ EOF
       key2.to_blob[0..5] = 'badkey'
       key3 = OpenSSL::PKey::DSA.new(512)
 
-      socket.expect do |s, type, buffer|
+      socket.expect do |s, type, _buffer|
         assert_equal SSH2_AGENT_REQUEST_IDENTITIES, type
         s.return(SSH2_AGENT_IDENTITIES_ANSWER, :long, 3, :string, Net::SSH::Buffer.from(:key, key1), :string, "My favorite key", :string, Net::SSH::Buffer.from(:key, key2), :string, "bad", :string, Net::SSH::Buffer.from(:key, key3), :string, "Okay, but not the best")
       end
@@ -159,7 +158,7 @@ EOF
       key2_bad = Net::SSH::Buffer.new("")
       key3 = OpenSSL::PKey::DSA.new(512)
 
-      socket.expect do |s, type, buffer|
+      socket.expect do |s, type, _buffer|
         assert_equal SSH2_AGENT_REQUEST_IDENTITIES, type
         s.return(SSH2_AGENT_IDENTITIES_ANSWER, :long, 3, :string, Net::SSH::Buffer.from(:key, key1), :string, "My favorite key", :string, key2_bad, :string, "bad", :string, Net::SSH::Buffer.from(:key, key3), :string, "Okay, but not the best")
       end
@@ -288,7 +287,6 @@ EOF
     end
 
     def test_add_ecdsa_identity
-      return unless defined?(OpenSSL::PKey::EC)
       ecdsa = OpenSSL::PKey::EC.new("prime256v1").generate_key
       socket.expect do |s,type,buffer|
         assert_equal SSH2_AGENT_ADD_IDENTITY, type
@@ -306,7 +304,6 @@ EOF
     end
 
     def test_add_ecdsa_cert_identity
-      return unless defined?(OpenSSL::PKey::EC)
       cert = make_cert(OpenSSL::PKey::EC.new("prime256v1").generate_key)
       socket.expect do |s,type,buffer|
         assert_equal SSH2_AGENT_ADD_IDENTITY, type
@@ -324,6 +321,7 @@ EOF
 
     def test_add_ed25519_identity
       return unless Net::SSH::Authentication::ED25519Loader::LOADED
+
       ed25519 = Net::SSH::Authentication::ED25519::PrivKey.read(ED25519, nil)
       socket.expect do |s,type,buffer|
         assert_equal SSH2_AGENT_ADD_IDENTITY, type
@@ -341,6 +339,7 @@ EOF
 
     def test_add_ed25519_cert_identity
       return unless Net::SSH::Authentication::ED25519Loader::LOADED
+
       cert = make_cert(Net::SSH::Authentication::ED25519::PrivKey.read(ED25519, nil))
       socket.expect do |s,type,buffer|
         assert_equal SSH2_AGENT_ADD_IDENTITY, type
@@ -358,7 +357,7 @@ EOF
     end
 
     def test_add_identity_should_raise_error_on_failure
-      socket.expect do |s,type,buffer|
+      socket.expect do |s,_type,_buffer|
         s.return(SSH_AGENT_FAILURE)
       end
 
@@ -380,7 +379,7 @@ EOF
     end
 
     def test_remove_identity_should_raise_error_on_failure
-      socket.expect do |s,type,buffer|
+      socket.expect do |s,_type,_buffer|
         s.return(SSH_AGENT_FAILURE)
       end
 
@@ -401,7 +400,7 @@ EOF
     end
 
     def test_remove_all_identities_should_raise_error_on_failure
-      socket.expect do |s,type,buffer|
+      socket.expect do |s,_type,_buffer|
         s.return(SSH_AGENT_FAILURE)
       end
 
@@ -435,6 +434,7 @@ EOF
 
       def send(data, flags)
         raise "got #{data.inspect} but no packet was expected" unless @expectation
+
         buffer = Net::SSH::Buffer.new(data)
         buffer.read_long # skip the length
         type = buffer.read_byte
@@ -469,8 +469,7 @@ EOF
     end
 
     def agent_socket_factory
-      @agent_socket_factory ||= -> {"/foo/bar.sock"}
+      @agent_socket_factory ||= -> { "/foo/bar.sock" }
     end
   end
-
 end

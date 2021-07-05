@@ -16,6 +16,10 @@ class TestKnownHosts < NetSSHTest
     perform_test(path("known_hosts/github_hash"))
   end
 
+  def test_parsing_known_hosts_empty_lines_and_comments
+    perform_test(path("known_hosts/known_hosts_ignore"))
+  end
+
   def test_missing_then_add
     Tempfile.open('github') do |f|
       f.write(File.read(path("known_hosts/github")))
@@ -31,7 +35,7 @@ class TestKnownHosts < NetSSHTest
   end
 
   def test_search_for
-    options = { user_known_hosts_file: path("known_hosts/github") }
+    options = { user_known_hosts_file: path("known_hosts/github"), global_known_hosts_file: [] }
     keys = Net::SSH::KnownHosts.search_for('github.com',options)
     assert_equal(["ssh-rsa"], keys.map(&:ssh_type))
   end
